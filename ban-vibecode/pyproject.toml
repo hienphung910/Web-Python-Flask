@@ -1,0 +1,13 @@
+[project]
+name = "guestbook"
+version = "1.0.0"
+description = "Sổ lưu bút viết bằng Flask"
+requires-python = ">=3.10"
+dependencies = ["Flask>=3.0", "matplotlib>=3.8"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Lời nhắn{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <h1>Lời nhắn <span class="count">{{ entries|length }}</span></h1>
+    <a class="btn btn-primary" href="{{ url_for('guestbook.add') }}">+ Viết lời nhắn</a>
+</div>
+
+{% if entries %}
+<ul class="entry-list">
+    {% for entry in entries %}
+    <li class="card entry">
+        <div class="avatar" aria-hidden="true">{{ entry.name[:1]|upper }}</div>
+        <div class="entry-body">
+            <div class="entry-meta">
+                <strong>{{ entry.name }}</strong>
+                <span class="muted">#{{ entry.id }} · {{ entry.created_display }}</span>
+            </div>
+            <p class="entry-message">{{ entry.message }}</p>
+        </div>
+        <form method="post" action="{{ url_for('guestbook.delete', entry_id=entry.id) }}"
+              onsubmit="return confirm('Xóa lời nhắn #{{ entry.id }}?');">
+            <button type="submit" class="btn btn-ghost" title="Xóa lời nhắn">Xóa</button>
+        </form>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<div class="card empty">
+    <p>Chưa có lời nhắn nào.</p>
+    <a class="btn btn-primary" href="{{ url_for('guestbook.add') }}">Viết lời nhắn đầu tiên</a>
+</div>
+{% endif %}
+{% endblock %}

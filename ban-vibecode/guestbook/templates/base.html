@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Guestbook{% endblock %} · Guestbook</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <div class="container topbar-inner">
+            <a class="brand" href="{{ url_for('guestbook.index') }}">✎ Guestbook</a>
+            <nav>
+                {% set endpoint = request.endpoint %}
+                <a href="{{ url_for('guestbook.index') }}" class="{{ 'active' if endpoint == 'guestbook.index' }}">Lời nhắn</a>
+                <a href="{{ url_for('guestbook.add') }}" class="{{ 'active' if endpoint == 'guestbook.add' }}">Viết lời nhắn</a>
+                <a href="{{ url_for('guestbook.stats') }}" class="{{ 'active' if endpoint == 'guestbook.stats' }}">Thống kê</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, text in messages %}
+            <div class="alert alert-{{ category }}">{{ text }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

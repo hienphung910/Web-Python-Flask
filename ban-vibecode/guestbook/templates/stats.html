@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Thống kê{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <h1>Thống kê</h1>
+</div>
+
+<div class="tiles">
+    <div class="card tile">
+        <span class="tile-label">Tổng số lời nhắn</span>
+        <span class="tile-value">{{ total }}</span>
+    </div>
+    <div class="card tile">
+        <span class="tile-label">Số người gửi</span>
+        <span class="tile-value">{{ senders }}</span>
+    </div>
+</div>
+
+<section class="card">
+    <h2>Top {{ top_n }} người gửi nhiều nhất</h2>
+    {% if top %}
+    {% set max_count = top[0][1] %}
+    <ol class="ranking">
+        {% for name, count in top %}
+        <li>
+            <span class="rank">{{ loop.index }}</span>
+            <span class="rank-name">{{ name }}</span>
+            <span class="rank-bar"><span style="width: {{ (count / max_count * 100)|round(1) }}%"></span></span>
+            <span class="rank-count">{{ count }}</span>
+        </li>
+        {% endfor %}
+    </ol>
+    {% else %}
+    <p class="muted">Chưa có dữ liệu.</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>Biểu đồ số lời nhắn theo người gửi</h2>
+    {% if has_chart %}
+    <img class="chart" src="{{ url_for('static', filename='stats.png', v=chart_version) }}"
+         alt="Biểu đồ cột số lời nhắn theo người gửi">
+    {% else %}
+    <p class="muted">Chưa có dữ liệu để vẽ biểu đồ.</p>
+    {% endif %}
+</section>
+{% endblock %}

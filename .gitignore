@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# dữ liệu và ảnh sinh ra khi chạy
+data.json
+instance/
+stats.png

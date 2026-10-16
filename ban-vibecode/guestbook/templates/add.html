@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Viết lời nhắn{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <h1>Viết lời nhắn</h1>
+</div>
+
+<form class="card form" method="post" action="{{ url_for('guestbook.add') }}" novalidate>
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <label for="name">Tên của bạn</label>
+    <input id="name" name="name" type="text" value="{{ name }}"
+           maxlength="{{ config.MAX_NAME_LENGTH }}" autocomplete="name" autofocus>
+
+    <label for="message">Lời nhắn</label>
+    <textarea id="message" name="message" rows="5"
+              maxlength="{{ config.MAX_MESSAGE_LENGTH }}">{{ message }}</textarea>
+
+    <div class="form-actions">
+        <a class="btn btn-ghost" href="{{ url_for('guestbook.index') }}">Hủy</a>
+        <button type="submit" class="btn btn-primary">Gửi lời nhắn</button>
+    </div>
+</form>
+{% endblock %}
