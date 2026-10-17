@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Thêm lời nhắn</title>
+</head>
+<body>
+    <h1>Thêm lời nhắn</h1>
+    <a href="/">Về trang chủ</a>
+
+    {% if error %}
+    <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <form action="/add" method="post">
+        <p>Tên:<br>
+            <input type="text" name="name" value="{{ name }}">
+        </p>
+        <p>Lời nhắn:<br>
+            <textarea name="message" rows="4" cols="40">{{ message }}</textarea>
+        </p>
+        <button type="submit">Gửi</button>
+    </form>
+</body>
+</html>

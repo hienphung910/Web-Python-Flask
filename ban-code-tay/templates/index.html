@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Guestbook</title>
+</head>
+<body>
+    <h1>Sổ lưu bút</h1>
+    <a href="/add">Thêm lời nhắn</a> | <a href="/stats">Thống kê</a>
+
+    <h2>Danh sách lời nhắn</h2>
+
+    {% if entries %}
+    <table border="1" cellpadding="5">
+        <tr>
+            <th>ID</th>
+            <th>Tên</th>
+            <th>Lời nhắn</th>
+            <th></th>
+        </tr>
+        {% for e in entries %}
+        <tr>
+            <td>{{ e.id }}</td>
+            <td>{{ e.name }}</td>
+            <td>{{ e.message }}</td>
+            <td>
+                <form action="/delete/{{ e.id }}" method="post">
+                    <button type="submit">Xóa</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <p>Chưa có lời nhắn nào.</p>
+    {% endif %}
+</body>
+</html>
