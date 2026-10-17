@@ -23,7 +23,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## Bản đơn giản
+## Bản code tay
 
 ```bash
 cd ban-code-tay
@@ -42,7 +42,7 @@ Khi khởi động, `load_data()` đọc dữ liệu từ `data.json`. Sau mỗi
 
 Cần chạy lệnh từ trong thư mục `ban-code-tay`, vì đường dẫn tới `data.json` và `static/stats.png` là đường dẫn tương đối.
 
-## Bản nâng cao
+## Bản vibecode
 
 ```bash
 cd ban-vibecode
