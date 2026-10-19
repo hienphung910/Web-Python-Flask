@@ -1,17 +1,49 @@
-import json
-
+import pymysql
+import pymysql.cursors
 import pytest
 
 from guestbook import create_app
 
+# Test dùng một database riêng, bảng được xóa sạch trước mỗi test
+TEST_DB = "guestbook_test"
+
+
+def make_config(tmp_path):
+    return {
+        "TESTING": True,
+        "DB_NAME": TEST_DB,
+        "CHART_FILE": tmp_path / "stats.png",
+    }
+
+
+def connect(app, database=None):
+    return pymysql.connect(
+        host=app.config["DB_HOST"],
+        port=app.config["DB_PORT"],
+        user=app.config["DB_USER"],
+        password=app.config["DB_PASSWORD"],
+        database=database,
+        charset="utf8mb4",
+        cursorclass=pymysql.cursors.DictCursor,
+        autocommit=True,
+    )
+
+
+def clear_entries(app):
+    """Xóa sạch bảng entries (TRUNCATE cũng reset lại bộ đếm AUTO_INCREMENT)."""
+    conn = connect(app, app.config["DB_NAME"])
+    try:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE entries")
+    finally:
+        conn.close()
+
 
 @pytest.fixture
 def app(tmp_path):
-    return create_app({
-        "TESTING": True,
-        "DATA_FILE": tmp_path / "data.json",
-        "CHART_FILE": tmp_path / "stats.png",
-    })
+    app = create_app(make_config(tmp_path))
+    clear_entries(app)
+    return app
 
 
 @pytest.fixture
@@ -21,6 +53,17 @@ def client(app):
 
 def add(client, name, message="Xin chào"):
     return client.post("/add", data={"name": name, "message": message})
+
+
+def read_rows(app):
+    """Đọc thẳng từ MySQL để kiểm tra dữ liệu thật sự được lưu."""
+    conn = connect(app, app.config["DB_NAME"])
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM entries ORDER BY id")
+            return cur.fetchall()
+    finally:
+        conn.close()
 
 
 def test_index_empty(client):
@@ -38,9 +81,10 @@ def test_add_valid_redirects_and_persists(client, app):
     assert response.status_code == 302
     assert response.headers["Location"] == "/"
 
-    saved = json.loads(app.config["DATA_FILE"].read_text(encoding="utf-8"))
+    saved = read_rows(app)
     assert saved[0]["name"] == "An"
     assert saved[0]["message"] == "Chào cả lớp"
+    assert saved[0]["created_at"]
 
 
 @pytest.mark.parametrize("name, message", [("", "abc"), ("An", ""), ("   ", "   ")])
@@ -81,22 +125,28 @@ def test_ids_are_not_reused(client, app):
     add(client, "Bình")
     client.post("/delete/2")
     add(client, "Chi")
-    saved = json.loads(app.config["DATA_FILE"].read_text(encoding="utf-8"))
-    assert [e["id"] for e in saved] == [1, 2]
+    # AUTO_INCREMENT: id 2 đã xóa không được cấp lại, "Chi" nhận id 3
+    assert [e["id"] for e in read_rows(app)] == [1, 3]
 
 
 def test_data_survives_restart(app, client, tmp_path):
     add(client, "An")
-    restarted = create_app({"TESTING": True, "DATA_FILE": tmp_path / "data.json",
-                            "CHART_FILE": tmp_path / "stats.png"})
+    restarted = create_app(make_config(tmp_path))
     assert "An" in restarted.test_client().get("/").get_data(as_text=True)
 
 
-def test_corrupted_data_file_starts_empty(tmp_path):
-    data_file = tmp_path / "data.json"
-    data_file.write_text("{không phải json", encoding="utf-8")
-    app = create_app({"TESTING": True, "DATA_FILE": data_file})
-    assert app.test_client().get("/").status_code == 200
+def test_database_and_table_created_on_startup(app):
+    conn = connect(app)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = %s AND table_name = 'entries'",
+                (app.config["DB_NAME"],),
+            )
+            assert cur.fetchone() is not None
+    finally:
+        conn.close()
 
 
 def test_stats(client, app):

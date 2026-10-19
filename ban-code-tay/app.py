@@ -1,37 +1,70 @@
-import json
-import os
+from datetime import datetime
 
+import pymysql
 import matplotlib
 matplotlib.use("Agg")  # vẽ biểu đồ ra file, không mở cửa sổ
 import matplotlib.pyplot as plt
 from flask import Flask, render_template, request, redirect
 
+# Thông tin kết nối MySQL nằm trong db_config.py (xem db_config.example.py)
+from db_config import DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
+
 app = Flask(__name__)
 
-DATA_FILE = "data.json"
+
+# Mở kết nối tới MySQL. DictCursor để mỗi dòng kết quả là 1 dict: row["name"]
+def get_db():
+    return pymysql.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        charset="utf8mb4",
+        cursorclass=pymysql.cursors.DictCursor,
+    )
 
 
-# Đọc dữ liệu từ file JSON, nếu chưa có file thì trả về list rỗng
-def load_data():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+# Tạo database và bảng entries nếu chưa có (chạy một lần khi khởi động)
+def init_db():
+    # Bước 1: kết nối chưa chọn database để tạo database
+    conn = pymysql.connect(host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASSWORD)
+    with conn.cursor() as cur:
+        cur.execute(f"CREATE DATABASE IF NOT EXISTS `{DB_NAME}` CHARACTER SET utf8mb4")
+    conn.close()
+
+    # Bước 2: tạo bảng trong database đó
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS entries (
+                id         INT AUTO_INCREMENT PRIMARY KEY,
+                name       VARCHAR(100) NOT NULL,
+                message    TEXT NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+        """)
+    conn.commit()
+    conn.close()
 
 
-# Ghi list lời nhắn ra file JSON
-def save_data():
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(entries, f, ensure_ascii=False, indent=2)
+# Lấy tất cả lời nhắn, mỗi dòng là 1 dict: {"id", "name", "message", "created_at"}
+def get_all_entries():
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM entries ORDER BY id")
+        rows = cur.fetchall()
+    conn.close()
+    return rows
 
 
-# List toàn cục chứa các lời nhắn, mỗi lời nhắn là 1 dict: {"id", "name", "message"}
-entries = load_data()
+init_db()
 
 
 # Trang chủ: hiển thị tất cả lời nhắn
 @app.route("/")
 def index():
+    entries = get_all_entries()
     return render_template("index.html", entries=entries)
 
 
@@ -49,31 +82,34 @@ def add():
         error = "Không được để trống tên và lời nhắn!"
         return render_template("add.html", error=error, name=name, message=message)
 
-    # Tạo id mới = id lớn nhất + 1
-    new_id = 1
-    for e in entries:
-        if e["id"] >= new_id:
-            new_id = e["id"] + 1
-
-    entries.append({"id": new_id, "name": name, "message": message})
-    save_data()
+    # INSERT vào bảng; id do MySQL tự tăng (AUTO_INCREMENT)
+    # %s là tham số, tránh lỗi SQL injection khi người dùng nhập ký tự lạ
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO entries (name, message, created_at) VALUES (%s, %s, %s)",
+            (name, message, datetime.now()),
+        )
+    conn.commit()
+    conn.close()
     return redirect("/")
 
 
 # Xóa lời nhắn theo id
 @app.route("/delete/<int:id>", methods=["GET", "POST"])
 def delete(id):
-    for e in entries:
-        if e["id"] == id:
-            entries.remove(e)
-            break
-    save_data()
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM entries WHERE id = %s", (id,))
+    conn.commit()
+    conn.close()
     return redirect("/")
 
 
 # Thống kê
 @app.route("/stats")
 def stats():
+    entries = get_all_entries()
     total = len(entries)
 
     # Đếm số lời nhắn của từng người: {"An": 3, "Bình": 1, ...}
