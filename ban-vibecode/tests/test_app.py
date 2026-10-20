@@ -1,32 +1,16 @@
-import sqlite3
+from datetime import datetime, timedelta
 
 import pytest
 
-from guestbook import create_app
-
-
-def make_config(tmp_path):
-    # Mỗi test dùng một file DB mới trong thư mục tạm nên luôn bắt đầu từ bảng rỗng
-    return {
-        "TESTING": True,
-        "DB_FILE": tmp_path / "guestbook.db",
-        "CHART_FILE": tmp_path / "stats.png",
-    }
-
-
-def query(app, sql, params=()):
-    """Chạy thẳng câu SQL trên file DB để kiểm tra dữ liệu thật sự được lưu."""
-    conn = sqlite3.connect(app.config["DB_FILE"])
-    conn.row_factory = sqlite3.Row
-    try:
-        return conn.execute(sql, params).fetchall()
-    finally:
-        conn.close()
+from guestbook import create_app, storage
+from guestbook.models import Entry
 
 
 @pytest.fixture
-def app(tmp_path):
-    return create_app(make_config(tmp_path))
+def app():
+    # List toàn cục dùng chung cho mọi app, nên phải xóa sạch trước mỗi test
+    storage.reset()
+    return create_app({"TESTING": True})
 
 
 @pytest.fixture
@@ -38,10 +22,6 @@ def add(client, name, message="Xin chào"):
     return client.post("/add", data={"name": name, "message": message})
 
 
-def read_rows(app):
-    return query(app, "SELECT * FROM entries ORDER BY id")
-
-
 def test_index_empty(client):
     response = client.get("/")
     assert response.status_code == 200
@@ -49,25 +29,46 @@ def test_index_empty(client):
 
 
 def test_add_shows_form(client):
-    assert client.get("/add").status_code == 200
+    page = client.get("/add").get_data(as_text=True)
+    assert 'name="name"' in page
+    assert 'name="message"' in page
 
 
-def test_add_valid_redirects_and_persists(client, app):
+def test_add_valid_redirects_and_saves_to_list(client):
     response = add(client, "An", "Chào cả lớp")
     assert response.status_code == 302
     assert response.headers["Location"] == "/"
 
-    saved = read_rows(app)
-    assert saved[0]["name"] == "An"
-    assert saved[0]["message"] == "Chào cả lớp"
-    assert saved[0]["created_at"]
+    assert len(storage.entries) == 1
+    entry = storage.entries[0]
+    assert (entry.id, entry.name, entry.message) == (1, "An", "Chào cả lớp")
 
 
-@pytest.mark.parametrize("name, message", [("", "abc"), ("An", ""), ("   ", "   ")])
-def test_add_rejects_empty_fields(client, name, message):
+def test_index_lists_entries_newest_first(client):
+    add(client, "An")
+    add(client, "Bình")
+    page = client.get("/").get_data(as_text=True)
+    assert page.index("Bình") < page.index("An")
+
+
+@pytest.mark.parametrize(
+    "name, message, error",
+    [
+        ("", "abc", "Vui lòng nhập tên"),
+        ("An", "", "Vui lòng nhập lời nhắn"),
+        ("   ", "   ", "Vui lòng nhập tên"),
+    ],
+)
+def test_add_rejects_empty_fields(client, name, message, error):
     response = add(client, name, message)
     assert response.status_code == 400
-    assert "Vui lòng nhập đầy đủ" in response.get_data(as_text=True)
+    assert error in response.get_data(as_text=True)
+    assert storage.entries == []
+
+
+def test_add_keeps_input_after_error(client):
+    page = add(client, "An", "").get_data(as_text=True)
+    assert 'value="An"' in page
 
 
 def test_add_rejects_too_long_name(client):
@@ -85,10 +86,7 @@ def test_delete(client):
     add(client, "An")
     add(client, "Bình")
     assert client.post("/delete/1").status_code == 302
-
-    page = client.get("/").get_data(as_text=True)
-    assert "Bình" in page
-    assert ">An<" not in page
+    assert [e.name for e in storage.entries] == ["Bình"]
 
 
 def test_delete_missing_id(client):
@@ -96,41 +94,34 @@ def test_delete_missing_id(client):
     assert "Không tìm thấy" in response.get_data(as_text=True)
 
 
-def test_ids_are_not_reused(client, app):
+def test_delete_requires_post(client):
+    add(client, "An")
+    assert client.get("/delete/1").status_code == 405
+    assert len(storage.entries) == 1
+
+
+def test_ids_are_not_reused(client):
     add(client, "An")
     add(client, "Bình")
     client.post("/delete/2")
     add(client, "Chi")
-    # AUTOINCREMENT: id 2 đã xóa không được cấp lại, "Chi" nhận id 3
-    assert [e["id"] for e in read_rows(app)] == [1, 3]
+    # id 2 đã xóa không được cấp lại, "Chi" nhận id 3
+    assert [e.id for e in storage.entries] == [1, 3]
 
 
-def test_data_survives_restart(app, client, tmp_path):
-    add(client, "An")
-    restarted = create_app(make_config(tmp_path))
-    assert "An" in restarted.test_client().get("/").get_data(as_text=True)
+def test_flash_after_add_and_delete(client):
+    page = client.post("/add", data={"name": "An", "message": "hi"}, follow_redirects=True)
+    assert "Đã thêm lời nhắn #1" in page.get_data(as_text=True)
+    page = client.post("/delete/1", follow_redirects=True)
+    assert "Đã xóa lời nhắn #1" in page.get_data(as_text=True)
 
 
-def test_database_and_table_created_on_startup(app):
-    assert app.config["DB_FILE"].exists()
-    tables = query(app, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'entries'")
-    assert len(tables) == 1
-
-
-def test_stats(client, app):
-    for name in ["An", "Bình", "An", "Chi", "An", "Bình", "Dũng", "Em", "Giang"]:
-        add(client, name)
-
-    response = client.get("/stats")
-    page = response.get_data(as_text=True)
-    assert response.status_code == 200
-    assert '<span class="tile-value">9</span>' in page
-    assert page.index("An") < page.index("Bình") < page.index("Chi")
-    assert "Giang" not in page.split("Biểu đồ")[0]  # chỉ hiện top 5
-    assert app.config["CHART_FILE"].stat().st_size > 0
-
-
-def test_stats_empty(client, app):
-    response = client.get("/stats")
-    assert response.status_code == 200
-    assert not app.config["CHART_FILE"].exists()
+def test_entry_helpers():
+    now = datetime(2026, 10, 20, 12, 0, 0)
+    entry = Entry(1, "Nguyễn Văn An", "hi", now - timedelta(minutes=5))
+    assert entry.initials == "NA"
+    assert Entry(2, "An", "hi").initials == "A"
+    assert entry.hue == Entry(3, "nguyễn văn an", "x").hue  # cùng tên thì cùng màu
+    assert entry.created_relative(now) == "5 phút trước"
+    assert entry.created_relative(now - timedelta(minutes=5)) == "vừa xong"
+    assert Entry(4, "An", "hi", datetime(2026, 1, 2, 8, 30)).created_relative(now) == "02/01/2026 08:30"

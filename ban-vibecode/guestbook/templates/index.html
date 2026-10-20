@@ -2,34 +2,66 @@
 {% block title %}Lời nhắn{% endblock %}
 
 {% block content %}
-<div class="page-head">
-    <h1>Lời nhắn <span class="count">{{ entries|length }}</span></h1>
-    <a class="btn btn-primary" href="{{ url_for('guestbook.add') }}">+ Viết lời nhắn</a>
-</div>
+{% set senders = entries|map(attribute='name')|unique|list|length %}
+
+<section class="hero">
+    <p class="eyebrow">Guestbook</p>
+    <h1>Để lại đôi lời,<br><em>giữ lại</em> một kỷ niệm.</h1>
+    <p class="lead">Mỗi lời nhắn là một dấu chân ghé qua. Hãy viết vài dòng cho chúng tôi nhé.</p>
+    <dl class="hero-stats">
+        <div><dt>Lời nhắn</dt><dd>{{ entries|length }}</dd></div>
+        <div><dt>Người gửi</dt><dd>{{ senders }}</dd></div>
+    </dl>
+</section>
 
 {% if entries %}
-<ul class="entry-list">
+<div class="toolbar">
+    <label class="search">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span class="visually-hidden">Tìm lời nhắn</span>
+        <input type="search" id="search" placeholder="Tìm theo tên hoặc nội dung…" autocomplete="off">
+        <kbd>/</kbd>
+    </label>
+</div>
+
+<ul class="notes" id="notes">
     {% for entry in entries %}
-    <li class="card entry">
-        <div class="avatar" aria-hidden="true">{{ entry.name[:1]|upper }}</div>
-        <div class="entry-body">
-            <div class="entry-meta">
-                <strong>{{ entry.name }}</strong>
-                <span class="muted">#{{ entry.id }} · {{ entry.created_display }}</span>
-            </div>
-            <p class="entry-message">{{ entry.message }}</p>
-        </div>
-        <form method="post" action="{{ url_for('guestbook.delete', entry_id=entry.id) }}"
-              onsubmit="return confirm('Xóa lời nhắn #{{ entry.id }}?');">
-            <button type="submit" class="btn btn-ghost" title="Xóa lời nhắn">Xóa</button>
-        </form>
+    <li class="note" style="--hue: {{ entry.hue }}; --i: {{ loop.index0 }}"
+        data-search="{{ (entry.name ~ ' ' ~ entry.message)|lower }}">
+        <article>
+            <p class="note-message">{{ entry.message }}</p>
+            <footer class="note-footer">
+                <span class="avatar" aria-hidden="true">{{ entry.initials }}</span>
+                <span class="note-author">
+                    <strong>{{ entry.name }}</strong>
+                    <time datetime="{{ entry.created_iso }}" title="{{ entry.created_display }}">{{ entry.created_relative() }}</time>
+                </span>
+                <span class="note-id">#{{ entry.id }}</span>
+                <form method="post" action="{{ url_for('guestbook.delete', entry_id=entry.id) }}"
+                      data-confirm="Lời nhắn #{{ entry.id }} của {{ entry.name }} sẽ bị xóa vĩnh viễn.">
+                    <button type="submit" class="icon-btn icon-btn-danger"
+                            aria-label="Xóa lời nhắn #{{ entry.id }} của {{ entry.name }}" title="Xóa">
+                        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </form>
+            </footer>
+        </article>
     </li>
     {% endfor %}
 </ul>
+<p class="no-results" id="no-results" hidden>Không có lời nhắn nào khớp với từ khóa.</p>
+
 {% else %}
-<div class="card empty">
-    <p>Chưa có lời nhắn nào.</p>
-    <a class="btn btn-primary" href="{{ url_for('guestbook.add') }}">Viết lời nhắn đầu tiên</a>
-</div>
+<section class="empty">
+    <svg class="empty-art" viewBox="0 0 160 120" aria-hidden="true">
+        <rect x="22" y="30" width="116" height="78" rx="12" class="art-back"/>
+        <path d="M22 42l58 38 58-38" class="art-line"/>
+        <rect x="44" y="12" width="72" height="56" rx="8" class="art-paper"/>
+        <path d="M56 28h48M56 38h36M56 48h42" class="art-line"/>
+    </svg>
+    <h2>Chưa có lời nhắn nào</h2>
+    <p class="muted">Trang này đang chờ dòng chữ đầu tiên. Bạn mở hàng nhé?</p>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('guestbook.add') }}">Viết lời nhắn đầu tiên</a>
+</section>
 {% endif %}
 {% endblock %}

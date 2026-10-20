@@ -2,26 +2,69 @@
 {% block title %}Viết lời nhắn{% endblock %}
 
 {% block content %}
-<div class="page-head">
-    <h1>Viết lời nhắn</h1>
+<a class="back-link" href="{{ url_for('guestbook.index') }}">
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Tất cả lời nhắn
+</a>
+
+<div class="compose">
+    <form class="panel compose-form" method="post" action="{{ url_for('guestbook.add') }}" novalidate id="compose-form">
+        <p class="eyebrow">Lời nhắn mới</p>
+        <h1>Viết vài dòng <em>gửi lại</em></h1>
+
+        {% if errors %}
+        <div class="form-alert" role="alert">Vui lòng kiểm tra lại các ô được đánh dấu bên dưới.</div>
+        {% endif %}
+
+        <div class="field {{ 'has-error' if errors.name }}">
+            <div class="field-head">
+                <label for="name">Tên của bạn</label>
+                <span class="counter" data-counter-for="name">{{ name|length }}/{{ config.MAX_NAME_LENGTH }}</span>
+            </div>
+            <input id="name" name="name" type="text" value="{{ name }}" placeholder="Ví dụ: Nguyễn Văn An"
+                   maxlength="{{ config.MAX_NAME_LENGTH }}" autocomplete="name"
+                   {% if errors.name or not errors %}autofocus{% endif %}
+                   {% if errors.name %}aria-invalid="true" aria-describedby="name-error"{% endif %}>
+            {% if errors.name %}<p class="field-error" id="name-error">{{ errors.name }}</p>{% endif %}
+        </div>
+
+        <div class="field {{ 'has-error' if errors.message }}">
+            <div class="field-head">
+                <label for="message">Lời nhắn</label>
+                <span class="counter" data-counter-for="message">{{ message|length }}/{{ config.MAX_MESSAGE_LENGTH }}</span>
+            </div>
+            <textarea id="message" name="message" rows="6" placeholder="Viết điều bạn muốn nhắn gửi…"
+                      maxlength="{{ config.MAX_MESSAGE_LENGTH }}"
+                      {% if errors.message and not errors.name %}autofocus{% endif %}
+                      {% if errors.message %}aria-invalid="true" aria-describedby="message-error"{% endif %}>{{ message }}</textarea>
+            {% if errors.message %}<p class="field-error" id="message-error">{{ errors.message }}</p>{% endif %}
+        </div>
+
+        <div class="form-actions">
+            <span class="hint muted"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> để gửi</span>
+            <a class="btn btn-ghost" href="{{ url_for('guestbook.index') }}">Hủy</a>
+            <button type="submit" class="btn btn-primary">
+                <span>Gửi lời nhắn</span>
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+        </div>
+    </form>
+
+    {# Xem trước: JavaScript cập nhật nội dung khi người dùng gõ #}
+    <aside class="preview" aria-label="Xem trước lời nhắn">
+        <p class="preview-label">Xem trước</p>
+        <div class="note" id="preview" style="--hue: 250">
+            <article>
+                <p class="note-message" id="preview-message" data-placeholder="Lời nhắn của bạn sẽ hiện ở đây.">{{ message or "Lời nhắn của bạn sẽ hiện ở đây." }}</p>
+                <footer class="note-footer">
+                    <span class="avatar" id="preview-avatar" aria-hidden="true">?</span>
+                    <span class="note-author">
+                        <strong id="preview-name" data-placeholder="Tên của bạn">{{ name or "Tên của bạn" }}</strong>
+                        <time>vừa xong</time>
+                    </span>
+                </footer>
+            </article>
+        </div>
+    </aside>
 </div>
-
-<form class="card form" method="post" action="{{ url_for('guestbook.add') }}" novalidate>
-    {% if error %}
-    <div class="alert alert-error">{{ error }}</div>
-    {% endif %}
-
-    <label for="name">Tên của bạn</label>
-    <input id="name" name="name" type="text" value="{{ name }}"
-           maxlength="{{ config.MAX_NAME_LENGTH }}" autocomplete="name" autofocus>
-
-    <label for="message">Lời nhắn</label>
-    <textarea id="message" name="message" rows="5"
-              maxlength="{{ config.MAX_MESSAGE_LENGTH }}">{{ message }}</textarea>
-
-    <div class="form-actions">
-        <a class="btn btn-ghost" href="{{ url_for('guestbook.index') }}">Hủy</a>
-        <button type="submit" class="btn btn-primary">Gửi lời nhắn</button>
-    </div>
-</form>
 {% endblock %}
