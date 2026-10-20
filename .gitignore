@@ -3,7 +3,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# cấu hình kết nối MySQL (có mật khẩu) và ảnh sinh ra khi chạy
-db_config.py
+# file SQLite và ảnh sinh ra khi chạy
+*.db
 instance/
 stats.png

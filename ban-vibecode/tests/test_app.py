@@ -1,49 +1,32 @@
-import pymysql
-import pymysql.cursors
+import sqlite3
+
 import pytest
 
 from guestbook import create_app
 
-# Test dùng một database riêng, bảng được xóa sạch trước mỗi test
-TEST_DB = "guestbook_test"
-
 
 def make_config(tmp_path):
+    # Mỗi test dùng một file DB mới trong thư mục tạm nên luôn bắt đầu từ bảng rỗng
     return {
         "TESTING": True,
-        "DB_NAME": TEST_DB,
+        "DB_FILE": tmp_path / "guestbook.db",
         "CHART_FILE": tmp_path / "stats.png",
     }
 
 
-def connect(app, database=None):
-    return pymysql.connect(
-        host=app.config["DB_HOST"],
-        port=app.config["DB_PORT"],
-        user=app.config["DB_USER"],
-        password=app.config["DB_PASSWORD"],
-        database=database,
-        charset="utf8mb4",
-        cursorclass=pymysql.cursors.DictCursor,
-        autocommit=True,
-    )
-
-
-def clear_entries(app):
-    """Xóa sạch bảng entries (TRUNCATE cũng reset lại bộ đếm AUTO_INCREMENT)."""
-    conn = connect(app, app.config["DB_NAME"])
+def query(app, sql, params=()):
+    """Chạy thẳng câu SQL trên file DB để kiểm tra dữ liệu thật sự được lưu."""
+    conn = sqlite3.connect(app.config["DB_FILE"])
+    conn.row_factory = sqlite3.Row
     try:
-        with conn.cursor() as cur:
-            cur.execute("TRUNCATE TABLE entries")
+        return conn.execute(sql, params).fetchall()
     finally:
         conn.close()
 
 
 @pytest.fixture
 def app(tmp_path):
-    app = create_app(make_config(tmp_path))
-    clear_entries(app)
-    return app
+    return create_app(make_config(tmp_path))
 
 
 @pytest.fixture
@@ -56,14 +39,7 @@ def add(client, name, message="Xin chào"):
 
 
 def read_rows(app):
-    """Đọc thẳng từ MySQL để kiểm tra dữ liệu thật sự được lưu."""
-    conn = connect(app, app.config["DB_NAME"])
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM entries ORDER BY id")
-            return cur.fetchall()
-    finally:
-        conn.close()
+    return query(app, "SELECT * FROM entries ORDER BY id")
 
 
 def test_index_empty(client):
@@ -125,7 +101,7 @@ def test_ids_are_not_reused(client, app):
     add(client, "Bình")
     client.post("/delete/2")
     add(client, "Chi")
-    # AUTO_INCREMENT: id 2 đã xóa không được cấp lại, "Chi" nhận id 3
+    # AUTOINCREMENT: id 2 đã xóa không được cấp lại, "Chi" nhận id 3
     assert [e["id"] for e in read_rows(app)] == [1, 3]
 
 
@@ -136,17 +112,9 @@ def test_data_survives_restart(app, client, tmp_path):
 
 
 def test_database_and_table_created_on_startup(app):
-    conn = connect(app)
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = %s AND table_name = 'entries'",
-                (app.config["DB_NAME"],),
-            )
-            assert cur.fetchone() is not None
-    finally:
-        conn.close()
+    assert app.config["DB_FILE"].exists()
+    tables = query(app, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'entries'")
+    assert len(tables) == 1
 
 
 def test_stats(client, app):

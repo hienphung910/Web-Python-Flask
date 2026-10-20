@@ -1,18 +1,16 @@
-"""Lưu trữ lời nhắn trong cơ sở dữ liệu MySQL."""
+"""Lưu trữ lời nhắn trong cơ sở dữ liệu SQLite."""
 
 from __future__ import annotations
 
 import logging
 import os
+import sqlite3
 import tempfile
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-
-import pymysql
-import pymysql.cursors
 
 from .models import Entry
 
@@ -23,10 +21,10 @@ STORAGE_KEY = "guestbook_storage"
 
 CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS entries (
-    id         INT AUTO_INCREMENT PRIMARY KEY,
-    name       VARCHAR(100) NOT NULL,
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL,
     message    TEXT NOT NULL,
-    created_at DATETIME NOT NULL
+    created_at TEXT NOT NULL
 )
 """
 
@@ -48,45 +46,31 @@ def atomic_write(path: Path, data: bytes) -> None:
         raise
 
 
-class MysqlStorage:
-    """Lời nhắn được lưu trong bảng ``entries`` của một database MySQL.
+class SqliteStorage:
+    """Lời nhắn được lưu trong bảng ``entries`` của một file SQLite.
 
-    Mỗi thao tác mở một kết nối riêng (kết nối PyMySQL không dùng chung được giữa
-    các thread), và được bọc trong lock để các request thêm/xóa chạy tuần tự.
-    ID do MySQL cấp (AUTO_INCREMENT) nên ID đã xóa không bao giờ được dùng lại.
+    Mỗi thao tác mở một kết nối riêng (mặc định kết nối sqlite3 không dùng chung
+    được giữa các thread), và được bọc trong lock để các request thêm/xóa chạy tuần tự.
+    ID do SQLite cấp (AUTOINCREMENT) nên ID đã xóa không bao giờ được dùng lại.
     """
 
-    def __init__(self, host: str, port: int, user: str, password: str, database: str) -> None:
-        self._conn_args = dict(
-            host=host,
-            port=port,
-            user=user,
-            password=password,
-            charset="utf8mb4",
-            cursorclass=pymysql.cursors.DictCursor,
-        )
-        self._database = database
+    def __init__(self, path: Path) -> None:
+        self._path = Path(path)
         self._lock = threading.Lock()
         self._init_db()
-        logger.info("Dùng MySQL %s@%s:%s, database %s", user, host, port, database)
+        logger.info("Dùng SQLite %s", self._path)
 
     def _init_db(self) -> None:
-        """Tạo database và bảng nếu chưa có."""
-        conn = pymysql.connect(**self._conn_args)
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    f"CREATE DATABASE IF NOT EXISTS `{self._database}` CHARACTER SET utf8mb4"
-                )
-        finally:
-            conn.close()
-        with self._connect() as conn, conn.cursor() as cur:
-            cur.execute(CREATE_TABLE_SQL)
+        """Tạo thư mục chứa file DB và bảng nếu chưa có."""
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        with self._connect() as conn:
+            conn.execute(CREATE_TABLE_SQL)
 
     @contextmanager
-    def _connect(self) -> Iterator[pymysql.connections.Connection]:
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         """Mở kết nối, commit khi xong (rollback nếu lỗi) rồi đóng lại."""
-        conn = pymysql.connect(**self._conn_args, database=self._database)
+        conn = sqlite3.connect(self._path)
+        conn.row_factory = sqlite3.Row
         try:
             yield conn
             conn.commit()
@@ -97,28 +81,25 @@ class MysqlStorage:
             conn.close()
 
     @staticmethod
-    def _to_entry(row: dict) -> Entry:
-        created = row["created_at"]
-        if isinstance(created, datetime):
-            created = created.isoformat(timespec="seconds")
-        return Entry(int(row["id"]), row["name"], row["message"], str(created))
+    def _to_entry(row: sqlite3.Row) -> Entry:
+        return Entry(int(row["id"]), row["name"], row["message"], row["created_at"])
 
     def all(self) -> list[Entry]:
-        with self._lock, self._connect() as conn, conn.cursor() as cur:
-            cur.execute("SELECT id, name, message, created_at FROM entries ORDER BY id")
-            return [self._to_entry(row) for row in cur.fetchall()]
+        with self._lock, self._connect() as conn:
+            rows = conn.execute("SELECT id, name, message, created_at FROM entries ORDER BY id")
+            return [self._to_entry(row) for row in rows]
 
     def add(self, name: str, message: str) -> Entry:
-        created = datetime.now().replace(microsecond=0)
-        with self._lock, self._connect() as conn, conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO entries (name, message, created_at) VALUES (%s, %s, %s)",
+        created = datetime.now().isoformat(timespec="seconds")
+        with self._lock, self._connect() as conn:
+            cur = conn.execute(
+                "INSERT INTO entries (name, message, created_at) VALUES (?, ?, ?)",
                 (name, message, created),
             )
-            return Entry(cur.lastrowid, name, message, created.isoformat(timespec="seconds"))
+            return Entry(cur.lastrowid, name, message, created)
 
     def delete(self, entry_id: int) -> bool:
         """Xóa theo ID. Trả về False nếu không tìm thấy."""
-        with self._lock, self._connect() as conn, conn.cursor() as cur:
-            cur.execute("DELETE FROM entries WHERE id = %s", (entry_id,))
+        with self._lock, self._connect() as conn:
+            cur = conn.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
             return cur.rowcount > 0

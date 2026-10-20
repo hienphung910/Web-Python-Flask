@@ -7,12 +7,12 @@ from pathlib import Path
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 
 from .stats import count_by_sender, render_bar_chart
-from .storage import STORAGE_KEY, MysqlStorage
+from .storage import STORAGE_KEY, SqliteStorage
 
 bp = Blueprint("guestbook", __name__)
 
 
-def get_storage() -> MysqlStorage:
+def get_storage() -> SqliteStorage:
     return current_app.extensions[STORAGE_KEY]
 
 
