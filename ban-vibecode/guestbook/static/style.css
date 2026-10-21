@@ -116,7 +116,7 @@ kbd {
     background: var(--surface-solid);
 }
 
-/* Các vệt màu loang mờ phía sau nền */
+/* Các vệt màu loang mờ phía sau nền, mỗi vệt trôi theo một đường riêng */
 .aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .aurora span {
     position: absolute;
@@ -124,14 +124,64 @@ kbd {
     border-radius: 50%;
     filter: blur(90px);
     opacity: 0.75;
-    animation: drift 24s ease-in-out infinite alternate;
+    animation: drift-1 22s ease-in-out infinite alternate;
 }
 .aurora span:nth-child(1) { background: var(--aurora-1); top: -18vmax; left: -10vmax; }
-.aurora span:nth-child(2) { background: var(--aurora-2); top: -12vmax; right: -14vmax; animation-delay: -8s; }
-.aurora span:nth-child(3) { background: var(--aurora-3); bottom: -26vmax; left: 30%; animation-delay: -16s; opacity: 0.5; }
+.aurora span:nth-child(2) { background: var(--aurora-2); top: -12vmax; right: -14vmax; animation-name: drift-2; animation-duration: 26s; }
+.aurora span:nth-child(3) { background: var(--aurora-3); bottom: -26vmax; left: 30%; animation-name: drift-3; animation-duration: 30s; opacity: 0.5; }
+.aurora span:nth-child(4) {
+    width: 30vmax; height: 30vmax;
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+    top: 38%; left: 55%;
+    opacity: 0.45;
+    animation-direction: alternate-reverse;
+    animation-duration: 34s;
+}
 
-@keyframes drift {
-    to { transform: translate(4vmax, 3vmax) scale(1.08); }
+@keyframes drift-1 {
+    50% { transform: translate(12vmax, 8vmax) scale(1.15); }
+    100% { transform: translate(4vmax, 16vmax) scale(0.95); }
+}
+@keyframes drift-2 {
+    50% { transform: translate(-14vmax, 10vmax) scale(0.9); }
+    100% { transform: translate(-6vmax, 20vmax) scale(1.1); }
+}
+@keyframes drift-3 {
+    50% { transform: translate(-10vmax, -12vmax) scale(1.12); }
+    100% { transform: translate(8vmax, -6vmax) scale(1); }
+}
+
+/* Lưới chấm mờ trôi chậm, nhạt dần ra mép */
+.aurora::after {
+    content: "";
+    position: absolute;
+    inset: -28px;
+    background-image: radial-gradient(color-mix(in srgb, var(--text) 12%, transparent) 1px, transparent 1.5px);
+    background-size: 28px 28px;
+    mask-image: radial-gradient(ellipse at 50% 30%, #000 15%, transparent 70%);
+    animation: pan 40s linear infinite;
+}
+@keyframes pan { to { transform: translate(28px, 28px); } }
+
+/* Những hạt sáng nhỏ bay lên chậm rãi; vị trí, cỡ, tốc độ đặt trong base.html */
+.particles { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.particles i {
+    position: absolute;
+    bottom: -20px;
+    left: var(--x);
+    width: var(--s); height: var(--s);
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+    opacity: 0;
+    animation: float-up var(--d) linear var(--delay) infinite;
+}
+@keyframes float-up {
+    0% { transform: translate(0, 0); opacity: 0; }
+    10% { opacity: 0.35; }
+    50% { transform: translate(3vw, -55vh); }
+    90% { opacity: 0.35; }
+    100% { transform: translate(-2vw, -110vh); opacity: 0; }
 }
 
 /* ============================================================
@@ -216,17 +266,6 @@ kbd {
     transition: transform 0.3s;
 }
 .brand:hover .brand-mark { transform: rotate(0deg) scale(1.05); }
-
-.footer {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px 24px;
-    flex-wrap: wrap;
-    padding-top: 24px;
-    padding-bottom: 32px;
-    border-top: 1px solid var(--border);
-    font-size: 13px;
-}
 
 /* ============================================================
    Phần đầu trang chủ
@@ -617,6 +656,36 @@ kbd {
 }
 
 /* Người dùng bật "giảm chuyển động" trong hệ điều hành thì tắt animation */
+/* ============================================================
+   Hiệu ứng thêm
+   ============================================================ */
+/* Hero hiện dần từng dòng */
+.hero > * { animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.hero > :nth-child(2) { animation-delay: 80ms; }
+.hero > :nth-child(3) { animation-delay: 160ms; }
+.hero > :nth-child(4) { animation-delay: 240ms; }
+
+/* Gạch chân vẽ dần dưới chữ nghiêng của tiêu đề */
+.hero h1 em {
+    background: linear-gradient(currentColor, currentColor) left 94% / 0 3px no-repeat;
+    animation: underline 0.9s 0.7s cubic-bezier(0.6, 0, 0.2, 1) forwards;
+}
+@keyframes underline { to { background-size: 100% 3px; } }
+
+/* Số liệu đếm dần lên (app.js), giữ độ rộng chữ số cố định để không bị giật */
+.hero-stats dd { font-variant-numeric: tabular-nums; }
+
+/* Nút lún xuống khi bấm */
+.btn:active, .icon-btn:active { transform: scale(0.96); }
+
+/* Avatar nảy nhẹ khi rê chuột vào thẻ */
+.note .avatar { transition: transform 0.35s cubic-bezier(0.3, 1.6, 0.5, 1); }
+.note article:hover .avatar { transform: scale(1.1) rotate(-6deg); }
+
+/* Trang viết lời nhắn: form và khung xem trước hiện lần lượt */
+.compose > * { animation: rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.compose > :nth-child(2) { animation-delay: 120ms; }
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;

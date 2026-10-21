@@ -153,4 +153,18 @@
         }
         return (crc ^ 0xffffffff) >>> 0;
     }
+
+    // ---------- Số liệu ở hero đếm dần lên ----------
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        document.querySelectorAll(".hero-stats dd").forEach(function (el) {
+            const target = parseInt(el.textContent, 10);
+            if (!(target > 0)) return;
+            const start = performance.now();
+            (function tick(now) {
+                const t = Math.min((now - start) / 900, 1);
+                el.textContent = Math.round(target * (1 - Math.pow(1 - t, 3)));
+                if (t < 1) requestAnimationFrame(tick);
+            })(start);
+        });
+    }
 })();

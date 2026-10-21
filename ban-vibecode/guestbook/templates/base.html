@@ -20,7 +20,12 @@
     <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
-    <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+    <div class="aurora" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+    <div class="particles" aria-hidden="true">
+        {%- for i in range(14) %}
+        <i style="--x: {{ (i * 37) % 100 }}%; --s: {{ 3 + (i * 5) % 6 }}px; --d: {{ 16 + (i * 7) % 14 }}s; --delay: -{{ (i * 11) % 24 }}s"></i>
+        {%- endfor %}
+    </div>
 
     <header class="topbar">
         <div class="container topbar-inner">
@@ -48,11 +53,6 @@
     <main class="container">
         {% block content %}{% endblock %}
     </main>
-
-    <footer class="footer container">
-        <span>Sổ lưu bút · Flask</span>
-        <span class="muted">Dữ liệu lưu trong bộ nhớ, sẽ mất khi tắt server.</span>
-    </footer>
 
     {# Thông báo sau khi thêm/xóa (flash message) hiện dạng toast #}
     <div class="toasts" role="status" aria-live="polite">
