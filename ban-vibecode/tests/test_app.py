@@ -7,10 +7,9 @@ from guestbook.models import Entry
 
 
 @pytest.fixture
-def app():
-    # List toàn cục dùng chung cho mọi app, nên phải xóa sạch trước mỗi test
-    storage.reset()
-    return create_app({"TESTING": True})
+def app(tmp_path):
+    # Mỗi test dùng một file SQLite mới trong thư mục tạm, nên luôn bắt đầu rỗng
+    return create_app({"TESTING": True, "DATABASE": str(tmp_path / "test.db")})
 
 
 @pytest.fixture
@@ -20,6 +19,12 @@ def client(app):
 
 def add(client, name, message="Xin chào"):
     return client.post("/add", data={"name": name, "message": message})
+
+
+def saved(app):
+    """Các lời nhắn đang có trong database."""
+    with app.app_context():
+        return storage.list_entries()
 
 
 def test_index_empty(client):
@@ -34,13 +39,14 @@ def test_add_shows_form(client):
     assert 'name="message"' in page
 
 
-def test_add_valid_redirects_and_saves_to_list(client):
+def test_add_valid_redirects_and_saves_to_db(app, client):
     response = add(client, "An", "Chào cả lớp")
     assert response.status_code == 302
     assert response.headers["Location"] == "/"
 
-    assert len(storage.entries) == 1
-    entry = storage.entries[0]
+    entries = saved(app)
+    assert len(entries) == 1
+    entry = entries[0]
     assert (entry.id, entry.name, entry.message) == (1, "An", "Chào cả lớp")
 
 
@@ -59,11 +65,11 @@ def test_index_lists_entries_newest_first(client):
         ("   ", "   ", "Vui lòng nhập tên"),
     ],
 )
-def test_add_rejects_empty_fields(client, name, message, error):
+def test_add_rejects_empty_fields(app, client, name, message, error):
     response = add(client, name, message)
     assert response.status_code == 400
     assert error in response.get_data(as_text=True)
-    assert storage.entries == []
+    assert saved(app) == []
 
 
 def test_add_keeps_input_after_error(client):
@@ -82,11 +88,11 @@ def test_html_is_escaped(client):
     assert "&lt;script&gt;" in page
 
 
-def test_delete(client):
+def test_delete(app, client):
     add(client, "An")
     add(client, "Bình")
     assert client.post("/delete/1").status_code == 302
-    assert [e.name for e in storage.entries] == ["Bình"]
+    assert [e.name for e in saved(app)] == ["Bình"]
 
 
 def test_delete_missing_id(client):
@@ -94,19 +100,19 @@ def test_delete_missing_id(client):
     assert "Không tìm thấy" in response.get_data(as_text=True)
 
 
-def test_delete_requires_post(client):
+def test_delete_requires_post(app, client):
     add(client, "An")
     assert client.get("/delete/1").status_code == 405
-    assert len(storage.entries) == 1
+    assert len(saved(app)) == 1
 
 
-def test_ids_are_not_reused(client):
+def test_ids_are_not_reused(app, client):
     add(client, "An")
     add(client, "Bình")
     client.post("/delete/2")
     add(client, "Chi")
     # id 2 đã xóa không được cấp lại, "Chi" nhận id 3
-    assert [e.id for e in storage.entries] == [1, 3]
+    assert [e.id for e in saved(app)] == [1, 3]
 
 
 def test_flash_after_add_and_delete(client):

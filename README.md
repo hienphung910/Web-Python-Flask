@@ -1,6 +1,6 @@
 # Guestbook - Lập trình web với Python (Flask)
 
-Ứng dụng sổ lưu bút cho phép xem, thêm và xóa lời nhắn. Bản code tay lưu lời nhắn trong SQLite nên dữ liệu còn sau khi tắt chương trình; bản vibecode lưu trong một list Python toàn cục nên dữ liệu sẽ mất khi tắt.
+Ứng dụng sổ lưu bút cho phép xem, thêm và xóa lời nhắn. Cả hai bản đều lưu lời nhắn trong SQLite nên dữ liệu vẫn còn sau khi tắt chương trình.
 
 Repo có hai phiên bản với cùng chức năng:
 
@@ -8,7 +8,7 @@ Repo có hai phiên bản với cùng chức năng:
 |---|---|---|
 | Mục tiêu | Dễ đọc, dễ giải thích | Tổ chức như một dự án Flask thực tế, giao diện chỉn chu |
 | Cấu trúc | Một file `app.py` | Package `guestbook/` chia thành nhiều module |
-| Dữ liệu | Bảng `entries` trong file SQLite `guestbook.db` | List `entries` gồm các `Entry` (dataclass), có lock |
+| Dữ liệu | Bảng `entries` trong file SQLite `guestbook.db` | Bảng `entries` trong `instance/guestbook.db`, đọc ra thành `Entry` (dataclass) |
 | Giao diện | HTML thuần | CSS + một chút JavaScript: dark mode, tìm kiếm, xem trước, hộp xác nhận xóa, toast |
 | Xóa | Chỉ POST | Chỉ POST, hỏi xác nhận trước khi xóa |
 | Test | Không có | 16 test pytest |
@@ -54,14 +54,15 @@ ban-vibecode/
 ├── guestbook/
 │   ├── __init__.py     # create_app(): application factory, cấu hình
 │   ├── models.py       # Entry (dataclass): chữ cái avatar, màu theo tên, thời gian tương đối
-│   ├── storage.py      # list entries toàn cục + các hàm thêm/xóa/liệt kê, có lock
+│   ├── storage.py      # kết nối SQLite + các hàm thêm/xóa/liệt kê
 │   ├── routes.py       # Blueprint chứa các route
 │   ├── static/         # style.css, app.js
 │   └── templates/      # base.html, index.html, add.html
+├── instance/guestbook.db   # tự tạo khi chạy lần đầu (không đưa lên git)
 └── tests/test_app.py
 ```
 
-App được tạo bằng hàm `create_app()` và các route nằm trong một Blueprint. `storage.py` giữ list toàn cục `entries` và cấp ID bằng `itertools.count`, nên ID của lời nhắn đã xóa không được dùng lại. Mọi thao tác trên list đều nằm trong `threading.Lock` vì Flask có thể xử lý nhiều request cùng lúc. Test gọi `storage.reset()` trước mỗi test để list luôn bắt đầu rỗng.
+App được tạo bằng hàm `create_app()` và các route nằm trong một Blueprint. Khi tạo app, `storage.init_app()` tạo bảng `entries (id, name, message, created_at)` nếu chưa có. Mỗi request mở một kết nối SQLite riêng (lưu trong `g`) và đóng khi request kết thúc. Cột `id` dùng `AUTOINCREMENT` nên ID của lời nhắn đã xóa không được dùng lại; dữ liệu người dùng luôn truyền qua dấu `?` để chống SQL injection. Đường dẫn file database nằm trong cấu hình `DATABASE`; mỗi test dùng một file SQLite riêng trong thư mục tạm nên luôn bắt đầu rỗng.
 
 Form không cho để trống và giới hạn độ dài tên, lời nhắn. Nếu dữ liệu sai, server trả về mã 400, hiện lại form, giữ nguyên nội dung đã nhập và báo lỗi ngay dưới ô bị sai. Sau khi thêm hoặc xóa, trang chủ hiện thông báo dạng toast (flash message). Jinja tự escape nội dung người dùng nhập, còn JavaScript chỉ gán bằng `textContent`, nên không bị chèn mã HTML/JS.
 
