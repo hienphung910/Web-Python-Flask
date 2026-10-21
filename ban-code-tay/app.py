@@ -37,7 +37,7 @@ def add():
 
 
 # Xóa lời nhắn theo id
-@app.route("/delete/<int:id>", methods=["GET", "POST"])
+@app.route("/delete/<int:id>", methods=["POST"])
 def delete(id):
     for e in entries:
         if e["id"] == id:
