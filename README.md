@@ -10,7 +10,7 @@ Repo có hai phiên bản với cùng chức năng:
 | Cấu trúc | Một file `app.py` | Package `guestbook/` chia thành nhiều module |
 | Dữ liệu | List `entries` gồm các dict | List `entries` gồm các `Entry` (dataclass), có lock |
 | Giao diện | HTML thuần | CSS + một chút JavaScript: dark mode, tìm kiếm, xem trước, hộp xác nhận xóa, toast |
-| Xóa | GET hoặc POST | Chỉ POST, hỏi xác nhận trước khi xóa |
+| Xóa | Chỉ POST | Chỉ POST, hỏi xác nhận trước khi xóa |
 | Test | Không có | 16 test pytest |
 
 ## Cài đặt
@@ -83,4 +83,4 @@ Phiên bản có SQLite và trang thống kê `/stats` (Buổi 2) vẫn còn tro
 | `/` | GET | Hiển thị tất cả lời nhắn |
 | `/add` | GET | Hiện form gồm `name` và `message` |
 | `/add` | POST | Nếu hợp lệ thì lưu rồi chuyển về `/`, nếu để trống thì hiện lại form kèm thông báo lỗi |
-| `/delete/<int:id>` | POST (bản code tay nhận cả GET) | Xóa lời nhắn theo ID rồi chuyển về `/` |
+| `/delete/<int:id>` | POST | Xóa lời nhắn theo ID rồi chuyển về `/` |
