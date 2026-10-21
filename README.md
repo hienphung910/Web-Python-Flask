@@ -1,6 +1,6 @@
 # Guestbook - Lập trình web với Python (Flask)
 
-Ứng dụng sổ lưu bút cho phép xem, thêm và xóa lời nhắn (phạm vi Buổi 1). Lời nhắn được lưu trong một list Python toàn cục, nên dữ liệu sẽ mất khi tắt chương trình.
+Ứng dụng sổ lưu bút cho phép xem, thêm và xóa lời nhắn. Bản code tay lưu lời nhắn trong SQLite nên dữ liệu còn sau khi tắt chương trình; bản vibecode lưu trong một list Python toàn cục nên dữ liệu sẽ mất khi tắt.
 
 Repo có hai phiên bản với cùng chức năng:
 
@@ -8,7 +8,7 @@ Repo có hai phiên bản với cùng chức năng:
 |---|---|---|
 | Mục tiêu | Dễ đọc, dễ giải thích | Tổ chức như một dự án Flask thực tế, giao diện chỉn chu |
 | Cấu trúc | Một file `app.py` | Package `guestbook/` chia thành nhiều module |
-| Dữ liệu | List `entries` gồm các dict | List `entries` gồm các `Entry` (dataclass), có lock |
+| Dữ liệu | Bảng `entries` trong file SQLite `guestbook.db` | List `entries` gồm các `Entry` (dataclass), có lock |
 | Giao diện | HTML thuần | CSS + một chút JavaScript: dark mode, tìm kiếm, xem trước, hộp xác nhận xóa, toast |
 | Xóa | Chỉ POST | Chỉ POST, hỏi xác nhận trước khi xóa |
 | Test | Không có | 16 test pytest |
@@ -32,11 +32,12 @@ python app.py
 
 ```
 ban-code-tay/
-├── app.py              # toàn bộ route + list entries
+├── app.py              # toàn bộ route + kết nối SQLite
+├── guestbook.db        # tự tạo khi chạy lần đầu (không đưa lên git)
 └── templates/          # index.html, add.html
 ```
 
-Lời nhắn được lưu trong list toàn cục `entries`, mỗi phần tử là một dict `{"id", "name", "message"}`. Biến `next_id` cấp ID tăng dần, nên ID của lời nhắn đã xóa không được dùng lại. Thêm thì `append` vào list, xóa thì duyệt list tìm đúng ID rồi `remove`.
+Lời nhắn được lưu trong bảng `entries (id, name, message)` của file `guestbook.db`. Khi khởi động, `init_db()` tạo bảng nếu chưa có. Cột `id` là `INTEGER PRIMARY KEY AUTOINCREMENT` nên SQLite tự cấp ID tăng dần và không dùng lại ID đã xóa. Thêm dùng `INSERT`, xóa dùng `DELETE ... WHERE id = ?`; dữ liệu người dùng luôn truyền qua dấu `?` để chống SQL injection. Có thể mở `guestbook.db` bằng extension SQLite Viewer của VS Code để xem dữ liệu.
 
 ## Bản vibecode
 
@@ -74,7 +75,7 @@ Giao diện:
 
 Khi triển khai thật, đặt secret key qua biến môi trường `GUESTBOOK_SECRET_KEY`.
 
-Phiên bản có SQLite và trang thống kê `/stats` (Buổi 2) vẫn còn trong lịch sử git, ở commit `f9156c3`.
+Phiên bản cũ có thêm trang thống kê `/stats` (Buổi 2) vẫn còn trong lịch sử git, ở commit `f9156c3`.
 
 ## Các route
 
