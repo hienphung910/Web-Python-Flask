@@ -1,15 +1,27 @@
+import json
 from datetime import datetime, timedelta
 
 import pytest
 
 from guestbook import create_app, storage
+from guestbook.charts import fold_tail
 from guestbook.models import Entry
+
+
+def make_app(tmp_path):
+    # Mọi file (SQLite, JSON, ảnh biểu đồ) nằm trong thư mục tạm của test
+    return create_app({
+        "TESTING": True,
+        "DATABASE": str(tmp_path / "test.db"),
+        "DATA_FILE": str(tmp_path / "data.json"),
+        "CHART_DIR": str(tmp_path / "charts"),
+    })
 
 
 @pytest.fixture
 def app(tmp_path):
-    # Mỗi test dùng một file SQLite mới trong thư mục tạm, nên luôn bắt đầu rỗng
-    return create_app({"TESTING": True, "DATABASE": str(tmp_path / "test.db")})
+    # Mỗi test bắt đầu với database rỗng
+    return make_app(tmp_path)
 
 
 @pytest.fixture
@@ -131,3 +143,84 @@ def test_entry_helpers():
     assert entry.created_relative(now) == "5 phút trước"
     assert entry.created_relative(now - timedelta(minutes=5)) == "vừa xong"
     assert Entry(4, "An", "hi", datetime(2026, 1, 2, 8, 30)).created_relative(now) == "02/01/2026 08:30"
+
+
+# ---------- Lưu ra file JSON ----------
+
+def read_json(tmp_path):
+    return json.loads((tmp_path / "data.json").read_text(encoding="utf-8"))
+
+
+def test_json_written_after_add_and_delete(client, tmp_path):
+    add(client, "An", "Chào")
+    add(client, "Bình")
+    assert [(e["id"], e["name"], e["message"]) for e in read_json(tmp_path)] == [
+        (1, "An", "Chào"),
+        (2, "Bình", "Xin chào"),
+    ]
+    client.post("/delete/1")
+    assert [e["name"] for e in read_json(tmp_path)] == ["Bình"]
+
+
+def test_json_loaded_on_startup_when_db_is_empty(tmp_path):
+    (tmp_path / "data.json").write_text(json.dumps([
+        {"id": 3, "name": "An", "message": "Từ file", "created_at": "2026-10-20T08:00:00"},
+        {"id": 7, "name": "Chi", "message": "Cũng từ file", "created_at": "2026-10-21T09:30:00"},
+    ]), encoding="utf-8")
+    app = make_app(tmp_path)
+    entries = saved(app)
+    assert [(e.id, e.name) for e in entries] == [(3, "An"), (7, "Chi")]
+    assert entries[1].created_at == datetime(2026, 10, 21, 9, 30)
+
+    # ID mới tiếp tục sau ID lớn nhất đã nạp
+    add(app.test_client(), "Dũng")
+    assert saved(app)[-1].id == 8
+
+
+def test_json_not_loaded_when_db_has_data(tmp_path):
+    app = make_app(tmp_path)
+    add(app.test_client(), "An")
+    (tmp_path / "data.json").write_text("[]", encoding="utf-8")
+    assert [e.name for e in saved(make_app(tmp_path))] == ["An"]
+
+
+# ---------- Thống kê ----------
+
+def test_stats_empty(client, tmp_path):
+    page = client.get("/stats").get_data(as_text=True)
+    assert "Chưa có gì để thống kê" in page
+    assert not (tmp_path / "charts").exists()
+
+
+def test_stats_total_and_top5(client):
+    for name, times in [("An", 3), ("Bình", 1), ("Chi", 2), ("Dũng", 4), ("Hà", 1), ("Giang", 1)]:
+        for _ in range(times):
+            add(client, name)
+    page = client.get("/stats").get_data(as_text=True)
+    assert "<dd>12</dd>" in page  # tổng số lời nhắn
+    ranking = page[page.index('class="ranking"'):page.index("</ol>")]
+    # Nhiều nhất trước, bằng nhau thì theo tên; người thứ 6 (Hà) bị cắt
+    order = ["Dũng", "An", "Chi", "Bình", "Giang"]
+    assert [ranking.index(f">{name}<") for name in order] == sorted(ranking.index(f">{name}<") for name in order)
+    assert ">Hà<" not in ranking
+
+
+def test_stats_draws_chart_png(client, tmp_path):
+    add(client, "An")
+    page = client.get("/stats").get_data(as_text=True)
+    for filename in ("stats.png", "stats-dark.png"):
+        assert (tmp_path / "charts" / filename).read_bytes()[1:4] == b"PNG"
+        assert f"/static/{filename}?v=" in page
+
+
+def test_nav_links_to_stats(client):
+    assert 'href="/stats"' in client.get("/").get_data(as_text=True)
+
+
+def test_fold_tail():
+    counts = [(f"Người {i}", 20 - i) for i in range(12)]
+    folded = fold_tail(counts, limit=10)
+    assert len(folded) == 10
+    assert folded[:9] == counts[:9]
+    assert folded[-1] == ("Khác (3 người)", 11 + 10 + 9)
+    assert fold_tail(counts[:3]) == counts[:3]

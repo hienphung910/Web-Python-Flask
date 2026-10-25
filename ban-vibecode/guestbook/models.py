@@ -7,6 +7,22 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 
+def initials_of(name: str) -> str:
+    """Chữ cái đầu để làm avatar: "Nguyễn Văn An" -> "NA", "An" -> "A"."""
+    words = name.split()
+    if len(words) >= 2:
+        return (words[0][0] + words[-1][0]).upper()
+    return name[:1].upper()
+
+
+def hue_of(name: str) -> int:
+    """Màu avatar (0-359) suy ra từ tên, cùng tên luôn cùng màu.
+
+    Dùng crc32 thay vì hash() vì hash() của Python đổi giá trị mỗi lần chạy lại.
+    """
+    return zlib.crc32(name.casefold().encode("utf-8")) % 360
+
+
 @dataclass(frozen=True, slots=True)
 class Entry:
     id: int
@@ -16,19 +32,11 @@ class Entry:
 
     @property
     def initials(self) -> str:
-        """Chữ cái đầu để làm avatar: "Nguyễn Văn An" -> "NA", "An" -> "A"."""
-        words = self.name.split()
-        if len(words) >= 2:
-            return (words[0][0] + words[-1][0]).upper()
-        return self.name[:1].upper()
+        return initials_of(self.name)
 
     @property
     def hue(self) -> int:
-        """Màu avatar (0-359) suy ra từ tên, cùng tên luôn cùng màu.
-
-        Dùng crc32 thay vì hash() vì hash() của Python đổi giá trị mỗi lần chạy lại.
-        """
-        return zlib.crc32(self.name.casefold().encode("utf-8")) % 360
+        return hue_of(self.name)
 
     @property
     def created_iso(self) -> str:
@@ -51,3 +59,19 @@ class Entry:
         if seconds < 7 * 86400:
             return f"{seconds // 86400} ngày trước"
         return self.created_display
+
+
+@dataclass(frozen=True, slots=True)
+class SenderStat:
+    """Số lời nhắn của một người gửi (dùng cho trang thống kê)."""
+
+    name: str
+    count: int
+
+    @property
+    def initials(self) -> str:
+        return initials_of(self.name)
+
+    @property
+    def hue(self) -> int:
+        return hue_of(self.name)

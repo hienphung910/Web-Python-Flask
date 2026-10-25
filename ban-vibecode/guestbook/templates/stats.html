@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Thống kê{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <p class="eyebrow">Thống kê</p>
+    <h1>Ai ghé thăm<br><em>nhiều nhất</em>?</h1>
+    <p class="lead">Tổng hợp từ tất cả lời nhắn đang có trong sổ.</p>
+    <dl class="hero-stats">
+        <div><dt>Lời nhắn</dt><dd>{{ total }}</dd></div>
+        <div><dt>Người gửi</dt><dd>{{ sender_count }}</dd></div>
+        <div><dt>Nhiều nhất</dt><dd>{{ top[0].count if top else 0 }}</dd></div>
+    </dl>
+</section>
+
+{% if top %}
+<div class="stats-grid">
+    <section class="panel">
+        <h2 class="panel-title">Top {{ top|length }} người gửi</h2>
+        <ol class="ranking">
+            {% for sender in top %}
+            <li class="rank" style="--hue: {{ sender.hue }}; --i: {{ loop.index0 }}">
+                <span class="rank-no">{{ loop.index }}</span>
+                <span class="avatar" aria-hidden="true">{{ sender.initials }}</span>
+                <span class="rank-name">{{ sender.name }}</span>
+                <span class="rank-count"><strong>{{ sender.count }}</strong> lời nhắn</span>
+                <span class="rank-share muted">{{ (sender.count / total * 100)|round|int }}%</span>
+            </li>
+            {% endfor %}
+        </ol>
+    </section>
+
+    <section class="panel">
+        <h2 class="panel-title">Số lời nhắn theo người gửi</h2>
+        {# Hai ảnh cho hai theme, CSS chỉ hiện ảnh hợp với theme đang dùng #}
+        <img class="chart chart-light" src="{{ url_for('static', filename='stats.png', v=version) }}"
+             alt="Biểu đồ cột: số lời nhắn của từng người gửi" width="900">
+        <img class="chart chart-dark" src="{{ url_for('static', filename='stats-dark.png', v=version) }}"
+             alt="Biểu đồ cột: số lời nhắn của từng người gửi" width="900">
+    </section>
+</div>
+
+{% else %}
+<section class="empty">
+    <svg class="empty-art" viewBox="0 0 160 120" aria-hidden="true">
+        <rect x="22" y="14" width="116" height="94" rx="12" class="art-paper"/>
+        <path d="M46 92V64M70 92V44M94 92V74M118 92V54" class="art-line"/>
+    </svg>
+    <h2>Chưa có gì để thống kê</h2>
+    <p class="muted">Biểu đồ sẽ xuất hiện khi có lời nhắn đầu tiên.</p>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('guestbook.add') }}">Viết lời nhắn đầu tiên</a>
+</section>
+{% endif %}
+{% endblock %}

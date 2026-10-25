@@ -19,6 +19,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         SECRET_KEY=os.environ.get("GUESTBOOK_SECRET_KEY", "dev-only-secret"),
         # File SQLite nằm trong thư mục instance/ (không đưa lên git)
         DATABASE=os.path.join(app.instance_path, "guestbook.db"),
+        # Bản sao JSON của lời nhắn, ghi lại sau mỗi lần thêm/xóa
+        DATA_FILE=os.path.join(app.instance_path, "data.json"),
+        # Thư mục chứa ảnh biểu đồ của trang /stats
+        CHART_DIR=app.static_folder,
         MAX_NAME_LENGTH=50,
         MAX_MESSAGE_LENGTH=500,
     )

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 
-from . import storage
+from . import charts, storage
 
 bp = Blueprint("guestbook", __name__)
 
@@ -58,3 +60,22 @@ def delete(entry_id: int):
     else:
         flash(f"Không tìm thấy lời nhắn #{entry_id}.", "error")
     return redirect(url_for(".index"))
+
+
+@bp.get("/stats")
+def stats():
+    senders = storage.count_by_name()
+    total = sum(s.count for s in senders)
+    version = 0
+    if senders:
+        chart_dir = Path(current_app.config["CHART_DIR"])
+        charts.render_sender_chart([(s.name, s.count) for s in senders], chart_dir)
+        # Đổi tham số ?v= mỗi lần vẽ lại để trình duyệt không hiện ảnh cũ trong cache
+        version = (chart_dir / "stats.png").stat().st_mtime_ns
+    return render_template(
+        "stats.html",
+        total=total,
+        sender_count=len(senders),
+        top=senders[:5],
+        version=version,
+    )
