@@ -1,4 +1,4 @@
-# Guestbook - Lập trình web với Python (Flask)
+# Guestbook: Lập trình web với Python (Flask)
 
 Ứng dụng sổ lưu bút cho phép xem, thêm, xóa lời nhắn và xem thống kê kèm biểu đồ. Cả hai bản đều lưu lời nhắn trong SQLite, đồng thời ghi một bản sao ra file JSON (`data.json`) sau mỗi lần thêm/xóa, nên dữ liệu vẫn còn sau khi tắt chương trình.
 

@@ -271,9 +271,6 @@ kbd {
    Phần đầu trang chủ
    ============================================================ */
 .eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
     margin-bottom: 14px;
     color: var(--accent);
     font-size: 12px;
@@ -281,7 +278,6 @@ kbd {
     letter-spacing: 0.16em;
     text-transform: uppercase;
 }
-.eyebrow::before { content: ""; width: 24px; height: 1.5px; background: currentColor; }
 
 .hero { padding: 40px 0 36px; }
 .hero h1, .compose h1 {
