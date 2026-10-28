@@ -4,7 +4,7 @@ import sqlite3
 import time
 
 import matplotlib
-matplotlib.use("Agg")  # chỉ vẽ ra file ảnh, không mở cửa sổ
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from flask import Flask, render_template, request, redirect
 
@@ -17,7 +17,7 @@ CHART_FILE = os.path.join(app.root_path, "static", "stats.png")
 
 def get_db():
     conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row  # lấy cột theo tên: row["name"]
+    conn.row_factory = sqlite3.Row
     return conn
 
 
@@ -34,7 +34,6 @@ def init_db():
     conn.close()
 
 
-# Ghi toàn bộ lời nhắn ra data.json (gọi sau mỗi lần thêm/xóa)
 def save_json():
     conn = get_db()
     rows = conn.execute("SELECT * FROM entries ORDER BY id").fetchall()
@@ -48,7 +47,6 @@ def save_json():
         json.dump(entries, f, ensure_ascii=False, indent=2)
 
 
-# Khi khởi động: nếu database đang trống mà có data.json thì nạp dữ liệu từ file vào
 def load_json():
     if not os.path.exists(JSON_FILE):
         return
@@ -59,7 +57,6 @@ def load_json():
         with open(JSON_FILE, encoding="utf-8") as f:
             entries = json.load(f)
         for e in entries:
-            # giữ nguyên id cũ để link xóa /delete/<id> vẫn đúng
             conn.execute(
                 "INSERT INTO entries (id, name, message) VALUES (?, ?, ?)",
                 (e["id"], e["name"], e["message"]),
@@ -72,7 +69,6 @@ init_db()
 load_json()
 
 
-# Trang chủ: hiển thị tất cả lời nhắn
 @app.route("/")
 def index():
     conn = get_db()
@@ -111,10 +107,8 @@ def delete(id):
     return redirect("/")
 
 
-# Thống kê: tổng số lời nhắn, top 5 người gửi và biểu đồ cột
 @app.route("/stats")
 def stats():
-    # Đếm số lời nhắn của từng người, sắp xếp từ nhiều đến ít
     conn = get_db()
     rows = conn.execute("""
         SELECT name, COUNT(*) AS count
@@ -130,7 +124,6 @@ def stats():
 
     top5 = rows[:5]
 
-    # Vẽ biểu đồ cột rồi lưu vào static/stats.png
     if total > 0:
         names = []
         counts = []
@@ -143,14 +136,13 @@ def stats():
         ax.set_title("Số lời nhắn theo người gửi")
         ax.set_xlabel("Người gửi")
         ax.set_ylabel("Số lời nhắn")
-        ax.yaxis.get_major_locator().set_params(integer=True)  # trục y chỉ hiện số nguyên
+        ax.yaxis.get_major_locator().set_params(integer=True)
         fig.tight_layout()
 
         os.makedirs(os.path.dirname(CHART_FILE), exist_ok=True)
         fig.savefig(CHART_FILE)
         plt.close(fig)
 
-    # Thêm ?v=... vào link ảnh để trình duyệt không dùng lại ảnh cũ đã lưu trong cache
     version = int(time.time())
     return render_template("stats.html", total=total, top5=top5, version=version)
 
